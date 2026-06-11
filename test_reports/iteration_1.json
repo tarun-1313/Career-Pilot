@@ -1,0 +1,50 @@
+{
+  "summary": "Comprehensive backend + frontend testing of CareerPilot AI. 18/18 backend pytest tests pass (auth, profile, resume, careers, skill-gap, roadmap, courses, jobs, portfolio, trends, salary, interview, SSE chat stream, progress). Frontend landing + all auth-gated routes (dashboard, profile, resume, careers, skills, roadmap, courses, jobs, chat, interview, portfolio, trends) load successfully behind session_token cookie. All advertised data-testid hooks present and functional.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/roadmap/generate", "issue": "Endpoint signature uses Dict[str, str] so 'months' must be a string. Currently the frontend converts via String(months) so it works, but the contract is fragile—any client sending months as int gets 422. Recommend using a Pydantic model or Dict[str, Any] and coercing months to int server-side."},
+      {"endpoint": "POST /api/auth/google/session", "issue": "Bogus session_id returns 401 as expected, but error detail surfaces 'Invalid Emergent session'. Consider rate-limiting since this endpoint hits an external service."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Roadmap select <option>", "issue": "Hydration warning: <span> rendered inside <option>. Caused by an inline expression in <option> children. While dev-only it can leak into prod console errors. Wrap option text without dynamic span injection.", "selector": "[data-testid='roadmap-months-select'] option", "priority": "LOW"},
+      {"component": "Trends bar chart Y-axis", "issue": "Long category labels on the 'Trending Tech (Momentum)' BarChart overlap each other and become unreadable (see screenshot). Increase YAxis width or rotate/truncate labels.", "selector": "Trends.jsx ResponsiveContainer YAxis width=110", "priority": "MEDIUM"},
+      {"component": "Trends page", "issue": "No loading skeleton/spinner while /api/trends (10-30s Gemini call) is in flight; page shows only the title and stays blank. Same pattern likely affects other AI-driven pages. Add a Skeleton/loading state.", "selector": "Trends.jsx", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/trends", "issues": ["Bar chart labels overlap on left axis", "No loading indicator during 10-30s AI call"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/conftest.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Optional: relax /api/roadmap/generate payload typing or coerce months on the server so non-string clients don't 422.",
+    "Optional: fix Roadmap.jsx <option> children to remove the injected <span> hydration warning.",
+    "Optional: add loading skeletons for AI-driven pages (Trends, Careers, Skill Gap, Roadmap, Salary, Interview) since Gemini calls take 10-30s."
+  ],
+  "critical_code_review_comments": [
+    "server.py is ~780 lines and houses every concern (auth, AI, jobs, portfolio, etc.). Split into routers/modules (auth.py, ai.py, jobs.py, interview.py) to stay under the 700-line guideline.",
+    "Repeated _gemini_json + LlmChat instantiation pattern across 7+ handlers — extract a helper that constructs the chat with a one-line system + user prompt.",
+    "Several endpoints accept untyped Dict[str, str]/Dict[str, Any] payloads (skill_gap, roadmap_generate, roadmap_toggle, portfolio_analyze). Replace with explicit Pydantic models for validation + OpenAPI docs.",
+    "auth_google_session: no existing-session de-dup; the same session_token can be inserted multiple times if the user logs in repeatedly. Use upsert on session_token.",
+    "Cookie set with secure=True + samesite='none' is correct for the preview origin, but app does not honor HTTPS-only env toggle for local dev—fine for now but flag for future."
+  ],
+  "updated_files": [
+    "/app/backend/tests/__init__.py",
+    "/app/backend/tests/conftest.py",
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {"backend": "100% (18/18)", "frontend": "100% of advertised data-testid hooks present; all routes render"},
+  "test_credentials": "Mock session created in MongoDB per /app/auth_testing.md. session_token used: test_session_1781188624459, user_id: user_test_1781188624459 (left in DB; subsequent agents may reuse or rotate).",
+  "seed_data_creation": "Inserted one TEST_ user + session into MongoDB collections users / user_sessions for auth-gated tests. Pytest fixture auto-creates a fresh user per session and cleans up users/sessions/resumes/career_recommendations/skill_gaps/roadmaps/portfolios/interviews/chat_messages on teardown.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend is fully green. To rerun: `pytest /app/backend/tests/backend_test.py -v` (takes ~60s including Gemini calls). For frontend manual checks, set cookie session_token=<value> with httpOnly secure sameSite=None on career-pilot-14.preview.emergentagent.com; create a fresh session in MongoDB via the playbook in /app/auth_testing.md if the existing one expires. Trends page needs >30s wait for first paint due to Gemini call.",
+  "rca_of_the_issue": "Only minor issue surfaced: POST /api/roadmap/generate returned 422 when 'months' sent as int. RCA: endpoint signature `payload: Dict[str, str]` forces all values to strings. Frontend already wraps with String(months) (see /app/frontend/src/lib/api.js line 37), so end-to-end works. Fix in test was to pass months as string; recommended permanent fix is to define `class RoadmapIn(BaseModel): role: str; months: int = 6` and accept int directly."
+}
