@@ -99,5 +99,16 @@ export const answerInterview = (interview_id, answer) =>
   api.post("/interview/answer", { interview_id, answer }).then((r) => r.data);
 export const interviewHistory = () => api.get("/interview/history").then((r) => r.data);
 
+// Resume rewriter (download)
+export const downloadRewrittenResume = async () => {
+  const res = await fetch(`${API}/resume/rewrite`, { method: "POST", credentials: "include" });
+  if (!res.ok) throw new Error("rewrite failed");
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "ATS_Resume.docx"; a.click();
+  URL.revokeObjectURL(url);
+};
+
 // Progress
 export const getProgress = () => api.get("/progress").then((r) => r.data);

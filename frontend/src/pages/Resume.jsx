@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { uploadResume, getLatestResume } from "@/lib/api";
+import { uploadResume, getLatestResume, downloadRewrittenResume } from "@/lib/api";
 import { toast } from "sonner";
-import { CloudArrowUp, FileText, CheckCircle, Warning } from "@phosphor-icons/react";
+import { CloudArrowUp, FileText, CheckCircle, Warning, DownloadSimple, Sparkle } from "@phosphor-icons/react";
 
 export default function Resume() {
   const [doc, setDoc] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [rewriting, setRewriting] = useState(false);
 
   useEffect(() => { getLatestResume().then(setDoc).catch(() => {}); }, []);
 
@@ -20,6 +21,15 @@ export default function Resume() {
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Upload failed");
     } finally { setLoading(false); }
+  };
+
+  const rewrite = async () => {
+    setRewriting(true);
+    try {
+      await downloadRewrittenResume();
+      toast.success("ATS-optimized resume downloaded");
+    } catch { toast.error("Rewrite failed"); }
+    finally { setRewriting(false); }
   };
 
   const parsed = doc?.parsed || {};
@@ -90,6 +100,19 @@ export default function Resume() {
                 </div>
               </>
             )}
+          </div>
+
+          <div className="flat-card p-8 lg:col-span-3">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="overline mb-2 flex items-center gap-2"><Sparkle size={12} weight="fill" /> AI RESUME REWRITER</div>
+                <h3 className="font-display text-xl font-extrabold">Download an ATS-optimized .docx</h3>
+                <p className="text-sm text-secondary mt-1">We integrate the missing keywords, strengthen verbs, and quantify achievements — truthfully.</p>
+              </div>
+              <button onClick={rewrite} disabled={rewriting} className="btn-yellow" data-testid="resume-rewrite-button">
+                <DownloadSimple size={16} weight="bold" /> {rewriting ? "Rewriting..." : "Generate & Download"}
+              </button>
+            </div>
           </div>
 
           {parsed.experience?.length > 0 && (

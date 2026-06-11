@@ -3,11 +3,13 @@ import { Link, NavLink, useNavigate, Outlet } from "react-router-dom";
 import {
   House, User, FileText, Compass, ChartBar, Path, GraduationCap,
   Briefcase, ChatCircleDots, Microphone, GithubLogo, TrendUp, SignOut, List, X,
+  Robot, ShareNetwork,
 } from "@phosphor-icons/react";
 import { useAuth } from "@/context/AuthContext";
 
 const nav = [
   { to: "/dashboard", label: "Overview", icon: House },
+  { to: "/twin", label: "Career Twin", icon: Robot },
   { to: "/profile", label: "Profile", icon: User },
   { to: "/resume", label: "Resume / ATS", icon: FileText },
   { to: "/careers", label: "Career Paths", icon: Compass },
@@ -15,10 +17,12 @@ const nav = [
   { to: "/roadmap", label: "Roadmap", icon: Path },
   { to: "/courses", label: "Courses", icon: GraduationCap },
   { to: "/jobs", label: "Jobs", icon: Briefcase },
-  { to: "/interview", label: "Mock Interview", icon: Microphone },
+  { to: "/voice-interview", label: "Voice Interview", icon: Microphone },
+  { to: "/interview", label: "Text Interview", icon: Microphone },
   { to: "/chat", label: "AI Mentor", icon: ChatCircleDots },
   { to: "/portfolio", label: "GitHub Analyzer", icon: GithubLogo },
   { to: "/trends", label: "Industry Trends", icon: TrendUp },
+  { to: "/share", label: "Public Page", icon: ShareNetwork },
 ];
 
 export default function DashboardLayout() {

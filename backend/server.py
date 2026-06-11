@@ -33,6 +33,9 @@ ADZUNA_APP_KEY = os.environ.get("ADZUNA_APP_KEY")
 RAPIDAPI_KEY = os.environ.get("RAPIDAPI_KEY")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 
+ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY")
+DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY")
+
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
 
@@ -761,6 +764,504 @@ async def progress(user: dict = Depends(get_current_user)):
 @api.get("/")
 async def root():
     return {"service": "CareerPilot AI", "status": "ok"}
+
+
+import base64
+from elevenlabs.client import ElevenLabs
+from elevenlabs import VoiceSettings
+
+# ElevenLabs client (sync — wrap with run_in_executor where needed)
+el_client = ElevenLabs(api_key=ELEVENLABS_API_KEY) if ELEVENLABS_API_KEY else None
+
+# Voice presets — pre-made ElevenLabs voices
+VOICE_PRESETS = {
+    "technical_male": {"voice_id": "JBFqnCBsd6RMkjVDRZzb", "label": "George — Technical Interviewer", "gender": "male"},
+    "technical_female": {"voice_id": "EXAVITQu4vr4xnSDxMaL", "label": "Sarah — Senior Engineer", "gender": "female"},
+    "hr_female": {"voice_id": "XrExE9yKIg1WjnnlVkGX", "label": "Matilda — HR Recruiter", "gender": "female"},
+    "hr_male": {"voice_id": "TX3LPaxmHKxFdv7VOQHJ", "label": "Liam — Recruiter", "gender": "male"},
+    "faang_strict": {"voice_id": "onwK4e9ZLuTAKqWW03F9", "label": "Daniel — FAANG Lead", "gender": "male"},
+    "startup_friendly": {"voice_id": "pFZP5JQG7iQjIQuC4Bku", "label": "Lily — Startup Manager", "gender": "female"},
+}
+
+PERSONALITIES = {
+    "friendly": "warm and encouraging; ask follow-ups gently",
+    "strict_faang": "rigorous FAANG-style interviewer; probe deeply, ask about edge cases and complexity",
+    "startup": "casual startup recruiter; mix of culture and technical questions",
+    "hr": "professional HR manager; focus on behavioral and soft skills",
+    "technical_architect": "senior technical architect; focus on system design, scalability, trade-offs",
+}
+
+
+# ---------- voice TTS ----------
+@api.post("/voice/tts")
+async def voice_tts(payload: Dict[str, str], _: dict = Depends(get_current_user)):
+    text = payload.get("text", "").strip()
+    voice_key = payload.get("voice", "technical_male")
+    if not text:
+        raise HTTPException(400, "text required")
+    if not el_client:
+        raise HTTPException(500, "ElevenLabs not configured")
+    voice_id = VOICE_PRESETS.get(voice_key, VOICE_PRESETS["technical_male"])["voice_id"]
+
+    def _gen() -> bytes:
+        stream = el_client.text_to_speech.convert(
+            text=text,
+            voice_id=voice_id,
+            model_id="eleven_turbo_v2_5",
+            output_format="mp3_44100_128",
+            voice_settings=VoiceSettings(stability=0.5, similarity_boost=0.75, style=0.3, use_speaker_boost=True),
+        )
+        buf = b""
+        for chunk in stream:
+            if chunk:
+                buf += chunk
+        return buf
+
+    audio_bytes = b""
+    try:
+        audio_bytes = await asyncio.to_thread(_gen)
+    except Exception as e:
+        log.warning("ElevenLabs TTS failed: %s", str(e)[:200])
+        raise HTTPException(status_code=503, detail={
+            "code": "tts_unavailable",
+            "message": "ElevenLabs unavailable (free tier may be blocked from cloud IPs). Frontend should fall back to browser TTS.",
+        })
+    b64 = base64.b64encode(audio_bytes).decode()
+    return {"audio_b64": b64, "mime": "audio/mpeg", "voice_id": voice_id}
+
+
+# ---------- voice STT (Deepgram) ----------
+@api.post("/voice/stt")
+async def voice_stt(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
+    if not DEEPGRAM_API_KEY:
+        raise HTTPException(500, "Deepgram not configured")
+    buf = await file.read()
+    mime = file.content_type or "audio/webm"
+    params = {
+        "model": "nova-3", "language": "en", "smart_format": "true",
+        "punctuate": "true", "diarize": "false", "filler_words": "true",
+    }
+    async with httpx.AsyncClient(timeout=60) as hx:
+        r = await hx.post(
+            "https://api.deepgram.com/v1/listen",
+            params=params,
+            headers={"Authorization": f"Token {DEEPGRAM_API_KEY}", "Content-Type": mime},
+            content=buf,
+        )
+    if r.status_code != 200:
+        # fallback to nova-2 if nova-3 unavailable
+        params["model"] = "nova-2"
+        async with httpx.AsyncClient(timeout=60) as hx:
+            r = await hx.post(
+                "https://api.deepgram.com/v1/listen",
+                params=params,
+                headers={"Authorization": f"Token {DEEPGRAM_API_KEY}", "Content-Type": mime},
+                content=buf,
+            )
+    if r.status_code != 200:
+        log.warning("Deepgram error: %s %s", r.status_code, r.text[:200])
+        raise HTTPException(502, "transcription failed")
+    data = r.json()
+    alt = (data.get("results", {}).get("channels", [{}])[0].get("alternatives", [{}]) or [{}])[0]
+    text = alt.get("transcript", "")
+    words = alt.get("words", []) or []
+    duration = float(data.get("metadata", {}).get("duration", 0) or 0)
+    # rough confidence proxy: words per sec + average word confidence + filler ratio
+    avg_conf = sum(float(w.get("confidence", 0.8)) for w in words) / max(1, len(words))
+    wps = len(words) / max(0.1, duration)
+    fillers = sum(1 for w in words if (w.get("word", "").lower() in {"um", "uh", "like", "you know", "actually", "basically"}))
+    filler_ratio = fillers / max(1, len(words))
+    # Compose confidence 0-100
+    confidence = int(max(0, min(100, avg_conf * 100 - filler_ratio * 60 - max(0, wps - 3.2) * 5)))
+    return {
+        "transcript": text, "duration_s": duration, "words": len(words),
+        "wps": round(wps, 2), "filler_words": fillers, "confidence": confidence,
+    }
+
+
+# ---------- Voice Interview Copilot ----------
+class VoiceInterviewStart(BaseModel):
+    role: str
+    interview_type: str = "technical"  # technical|hr|recruiter|coding|behavioral|system_design
+    difficulty: str = "intermediate"   # beginner|intermediate|advanced|faang
+    personality: str = "friendly"
+    voice: str = "technical_male"
+    use_resume: bool = True
+
+
+class VoiceInterviewAnswer(BaseModel):
+    interview_id: str
+    transcript: str
+    confidence: Optional[int] = None
+    duration_s: Optional[float] = None
+    wps: Optional[float] = None
+    filler_words: Optional[int] = None
+    code: Optional[str] = None
+    language: Optional[str] = None
+
+
+async def _vi_chat(sid: str, system: str) -> LlmChat:
+    return LlmChat(api_key=EMERGENT_LLM_KEY, session_id=sid, system_message=system).with_model(*GEMINI_MODEL)
+
+
+def _vi_system(role: str, itype: str, difficulty: str, personality: str, resume_skills: list, resume_projects: list) -> str:
+    style = PERSONALITIES.get(personality, PERSONALITIES["friendly"])
+    resume_ctx = ""
+    if resume_skills or resume_projects:
+        resume_ctx = (
+            f"\nThe candidate's resume includes skills: {', '.join(resume_skills[:25])}."
+            f"\nProjects: {json.dumps(resume_projects[:5])}."
+            "\nAsk at least TWO questions grounded in these projects/skills."
+        )
+    return (
+        f"You are conducting a {difficulty.upper()} {itype} interview for the role of {role}. "
+        f"Personality: {style}. Speak conversationally as if voice — short, natural sentences. "
+        "Ask ONE concise question per turn. After candidate answers, briefly acknowledge (1 sentence), "
+        "then ask the next question or a follow-up. "
+        + resume_ctx +
+        " After EXACTLY 6 candidate turns, output ONLY a JSON report wrapped in <report>...</report> with keys: "
+        "technical_score(0-100), communication_score(0-100), confidence_score(0-100), problem_solving_score(0-100), "
+        "clarity_score(0-100), overall(0-100), strengths(list), improvements(list), "
+        "recommended_topics(list), suggested_projects(list), summary(string). "
+        "Do not include any text outside the <report> tags when finishing."
+    )
+
+
+@api.get("/voice-interview/presets")
+async def vi_presets(_: dict = Depends(get_current_user)):
+    return {
+        "voices": [{"key": k, **v} for k, v in VOICE_PRESETS.items()],
+        "personalities": [{"key": k, "label": k.replace("_", " ").title(), "desc": v} for k, v in PERSONALITIES.items()],
+        "types": ["technical", "hr", "recruiter", "coding", "behavioral", "system_design"],
+        "difficulties": ["beginner", "intermediate", "advanced", "faang"],
+    }
+
+
+@api.post("/voice-interview/start")
+async def vi_start(body: VoiceInterviewStart, user: dict = Depends(get_current_user)):
+    resume_skills, resume_projects = [], []
+    if body.use_resume:
+        rdoc = await db.resumes.find_one({"user_id": user["user_id"]}, {"_id": 0}, sort=[("created_at", -1)])
+        if rdoc and rdoc.get("parsed"):
+            resume_skills = rdoc["parsed"].get("skills", []) or []
+            resume_projects = rdoc["parsed"].get("projects", []) or []
+
+    iid = f"vint_{uuid.uuid4().hex[:10]}"
+    system = _vi_system(body.role, body.interview_type, body.difficulty, body.personality, resume_skills, resume_projects)
+
+    chat = await _vi_chat(iid, system)
+    resp = await chat.send_message(UserMessage(text=f"Begin the {body.interview_type} interview for {body.role}. Greet briefly (1 sentence) then ask your first question."))
+    first_q = resp if isinstance(resp, str) else getattr(resp, "content", str(resp))
+
+    doc = {
+        "interview_id": iid, "user_id": user["user_id"],
+        "role": body.role, "interview_type": body.interview_type, "difficulty": body.difficulty,
+        "personality": body.personality, "voice": body.voice,
+        "system_prompt": system,
+        "turns": [{"q": first_q, "a": None, "metrics": None, "code": None}],
+        "status": "active", "report": None,
+        "created_at": now_utc().isoformat(),
+    }
+    await db.voice_interviews.insert_one(dict(doc))
+    return jsonable(doc)
+
+
+@api.post("/voice-interview/answer")
+async def vi_answer(body: VoiceInterviewAnswer, user: dict = Depends(get_current_user)):
+    doc = await db.voice_interviews.find_one({"interview_id": body.interview_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "interview not found")
+
+    chat = await _vi_chat(body.interview_id, doc["system_prompt"])
+    turns = doc["turns"]
+    # replay prior answers to rebuild context (Gemini LlmChat persists by session_id but reload safety)
+    for t in turns:
+        if t.get("a"):
+            await chat.send_message(UserMessage(text=t["a"]))
+
+    metrics = {
+        "confidence": body.confidence, "duration_s": body.duration_s,
+        "wps": body.wps, "filler_words": body.filler_words,
+    }
+    answer_payload = body.transcript
+    if body.code:
+        answer_payload += f"\n\nMy code ({body.language or 'python'}):\n```\n{body.code}\n```"
+
+    if turns and turns[-1].get("a") is None:
+        turns[-1]["a"] = body.transcript
+        turns[-1]["metrics"] = metrics
+        if body.code:
+            turns[-1]["code"] = {"language": body.language, "code": body.code}
+
+    resp = await chat.send_message(UserMessage(text=answer_payload))
+    reply = resp if isinstance(resp, str) else getattr(resp, "content", str(resp))
+
+    finished = "<report>" in reply
+    report = None
+    if finished:
+        try:
+            s = reply.split("<report>", 1)[1].split("</report>", 1)[0]
+            s = s.strip().strip("`")
+            if s.lower().startswith("json"):
+                s = s[4:]
+            a, b = s.find("{"), s.rfind("}")
+            if a >= 0 and b > a:
+                s = s[a:b + 1]
+            report = json.loads(s)
+        except Exception as e:
+            log.warning("vi report parse: %s", e)
+        doc["status"] = "completed"
+        doc["report"] = report
+    else:
+        turns.append({"q": reply, "a": None, "metrics": None, "code": None})
+
+    await db.voice_interviews.update_one(
+        {"interview_id": body.interview_id},
+        {"$set": {"turns": turns, "status": doc["status"], "report": doc.get("report")}},
+    )
+    return {
+        "interview_id": body.interview_id,
+        "finished": finished,
+        "next_question": None if finished else reply,
+        "report": report,
+    }
+
+
+@api.get("/voice-interview/{interview_id}")
+async def vi_get(interview_id: str, user: dict = Depends(get_current_user)):
+    doc = await db.voice_interviews.find_one(
+        {"interview_id": interview_id, "user_id": user["user_id"]}, {"_id": 0}
+    )
+    if not doc:
+        raise HTTPException(404, "not found")
+    return doc
+
+
+@api.get("/voice-interview")
+async def vi_list(user: dict = Depends(get_current_user)):
+    items = await db.voice_interviews.find(
+        {"user_id": user["user_id"]}, {"_id": 0}
+    ).sort("created_at", -1).to_list(30)
+    return {"interviews": items}
+
+
+# ---------- Code evaluation ----------
+@api.post("/code/evaluate")
+async def code_evaluate(payload: Dict[str, str], _: dict = Depends(get_current_user)):
+    code = payload.get("code", "")
+    language = payload.get("language", "python")
+    problem = payload.get("problem", "")
+    if not code:
+        raise HTTPException(400, "code required")
+    sys_p = (
+        "You are a senior coding interviewer. Evaluate the candidate's code. "
+        "Return STRICT JSON: {correctness(0-100), time_complexity, space_complexity, "
+        "code_quality(0-100), bugs(list), improvements(list), better_solution(string), overall(0-100)}"
+    )
+    result = await _gemini_json(sys_p, json.dumps({"language": language, "problem": problem, "code": code[:6000]}))
+    return result
+
+
+# ---------- Resume Rewriter ----------
+@api.post("/resume/rewrite")
+async def resume_rewrite(user: dict = Depends(get_current_user)):
+    rdoc = await db.resumes.find_one({"user_id": user["user_id"]}, {"_id": 0}, sort=[("created_at", -1)])
+    if not rdoc:
+        raise HTTPException(400, "Upload a resume first")
+    sys_p = (
+        "You are an expert ATS resume writer. Rewrite the candidate's resume to maximise ATS score and impact. "
+        "Use STRONG action verbs, quantify achievements, integrate the missing_keywords naturally, "
+        "and keep it truthful (do not invent facts). Return STRICT JSON: "
+        "{name, headline, summary, contact:{location, email}, "
+        "experience:[{role, company, duration, bullets:[string]}], "
+        "projects:[{name, bullets:[string]}], "
+        "education:[{degree, institution, year}], "
+        "skills:[string], certifications:[string]}"
+    )
+    payload = {
+        "user_profile": {"name": user.get("name"), "email": user.get("email"), "career_goals": user.get("career_goals")},
+        "original_text": rdoc.get("raw_text", "")[:9000],
+        "parsed": rdoc.get("parsed", {}),
+        "missing_keywords": (rdoc.get("parsed") or {}).get("missing_keywords", []),
+    }
+    rewritten = await _gemini_json(sys_p, json.dumps(payload))
+
+    # Build DOCX
+    from docx import Document
+    from docx.shared import Pt, RGBColor
+    doc = Document()
+    styles = doc.styles
+    # Title
+    name = rewritten.get("name") or user.get("name") or "Candidate"
+    h = doc.add_paragraph()
+    run = h.add_run(name)
+    run.bold = True
+    run.font.size = Pt(20)
+    if rewritten.get("headline"):
+        p = doc.add_paragraph(rewritten["headline"])
+        p.runs[0].italic = True
+    contact = rewritten.get("contact") or {}
+    contact_line = " · ".join(filter(None, [contact.get("location"), contact.get("email") or user.get("email")]))
+    if contact_line:
+        doc.add_paragraph(contact_line)
+
+    def section(title):
+        p = doc.add_paragraph()
+        r = p.add_run(title.upper())
+        r.bold = True
+        r.font.size = Pt(12)
+
+    if rewritten.get("summary"):
+        section("Summary")
+        doc.add_paragraph(rewritten["summary"])
+
+    if rewritten.get("skills"):
+        section("Skills")
+        doc.add_paragraph(" • ".join(rewritten["skills"]))
+
+    for sec_key, sec_label in [("experience", "Experience"), ("projects", "Projects")]:
+        items = rewritten.get(sec_key) or []
+        if not items:
+            continue
+        section(sec_label)
+        for it in items:
+            head = doc.add_paragraph()
+            r1 = head.add_run(it.get("role") or it.get("name") or "")
+            r1.bold = True
+            sub = []
+            if it.get("company"): sub.append(it["company"])
+            if it.get("duration"): sub.append(it["duration"])
+            if sub: head.add_run(" — " + " · ".join(sub))
+            for b in (it.get("bullets") or []):
+                doc.add_paragraph(b, style="List Bullet")
+
+    if rewritten.get("education"):
+        section("Education")
+        for e in rewritten["education"]:
+            doc.add_paragraph(f"{e.get('degree','')} — {e.get('institution','')} ({e.get('year','')})")
+
+    if rewritten.get("certifications"):
+        section("Certifications")
+        for c in rewritten["certifications"]:
+            doc.add_paragraph(c, style="List Bullet")
+
+    out = io.BytesIO()
+    doc.save(out)
+    out.seek(0)
+    fname = f"{name.replace(' ', '_')}_ATS_Resume.docx"
+    return StreamingResponse(
+        out,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
+# ---------- AI Career Twin ----------
+@api.post("/career-twin/brief")
+async def career_twin_brief(user: dict = Depends(get_current_user)):
+    progress = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    road = await db.roadmaps.find_one({"user_id": user["user_id"]}, {"_id": 0}, sort=[("created_at", -1)])
+    careers = await db.career_recommendations.find({"user_id": user["user_id"]}, {"_id": 0}).to_list(10)
+    trends_doc = await db.trends_cache.find_one({"_id": "latest"}, {"_id": 0})
+    sys_p = (
+        "You are the user's AI Career Twin — a persistent agent that tracks their growth and the market. "
+        "Generate this week's brief. Be specific, opinionated, and actionable. "
+        "Return STRICT JSON: {greeting, this_week_focus, market_signals:[string], opportunities:[{title, why_now}], "
+        "skills_to_practice:[string], recommended_action:string, motivation_quote}"
+    )
+    inp = {
+        "user": {"name": progress.get("name"), "skills": progress.get("skills"), "goals": progress.get("career_goals")},
+        "roadmap": road.get("data") if road else None,
+        "completed_milestones": (road or {}).get("completed_milestones", []),
+        "career_matches": [{"name": c.get("name"), "match": c.get("match_score")} for c in careers],
+        "week_of": now_utc().isoformat()[:10],
+    }
+    brief = await _gemini_json(sys_p, json.dumps(inp))
+    doc = {
+        "user_id": user["user_id"],
+        "week_of": inp["week_of"],
+        "brief": brief,
+        "created_at": now_utc().isoformat(),
+    }
+    await db.career_twin.update_one(
+        {"user_id": user["user_id"], "week_of": doc["week_of"]},
+        {"$set": doc}, upsert=True,
+    )
+    return doc
+
+
+@api.get("/career-twin")
+async def career_twin_latest(user: dict = Depends(get_current_user)):
+    doc = await db.career_twin.find_one(
+        {"user_id": user["user_id"]}, {"_id": 0}, sort=[("created_at", -1)]
+    )
+    return doc or {}
+
+
+# ---------- Public Profile ----------
+class PublishIn(BaseModel):
+    slug: str
+    bio: Optional[str] = None
+    headline: Optional[str] = None
+    show_resume: bool = False
+    show_portfolio: bool = True
+
+
+@api.post("/public-profile/publish")
+async def publish_profile(body: PublishIn, user: dict = Depends(get_current_user)):
+    slug = body.slug.lower().strip().replace(" ", "-")
+    if not slug.replace("-", "").isalnum():
+        raise HTTPException(400, "slug must be alphanumeric or hyphenated")
+    existing = await db.public_profiles.find_one({"slug": slug, "user_id": {"$ne": user["user_id"]}})
+    if existing:
+        raise HTTPException(409, "slug taken")
+    doc = {
+        "slug": slug, "user_id": user["user_id"],
+        "headline": body.headline, "bio": body.bio,
+        "show_resume": body.show_resume, "show_portfolio": body.show_portfolio,
+        "updated_at": now_utc().isoformat(),
+    }
+    await db.public_profiles.update_one({"user_id": user["user_id"]}, {"$set": doc}, upsert=True)
+    return doc
+
+
+@api.get("/public-profile/me")
+async def get_my_public_profile(user: dict = Depends(get_current_user)):
+    doc = await db.public_profiles.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    return doc or {}
+
+
+@api.get("/public/{slug}")
+async def get_public_profile(slug: str):
+    p = await db.public_profiles.find_one({"slug": slug.lower()}, {"_id": 0})
+    if not p:
+        raise HTTPException(404, "Profile not found")
+    user = await db.users.find_one({"user_id": p["user_id"]}, {"_id": 0})
+    if not user:
+        raise HTTPException(404, "User not found")
+    out = {
+        "slug": p["slug"],
+        "headline": p.get("headline"),
+        "bio": p.get("bio"),
+        "name": user.get("name"),
+        "picture": user.get("picture"),
+        "skills": user.get("skills", []),
+        "education": user.get("education"),
+        "degree": user.get("degree"),
+        "career_goals": user.get("career_goals"),
+        "github_url": user.get("github_url"),
+        "portfolio_url": user.get("portfolio_url"),
+    }
+    if p.get("show_portfolio"):
+        port = await db.portfolios.find_one({"user_id": p["user_id"]}, {"_id": 0})
+        if port:
+            out["portfolio"] = {
+                "score": (port.get("analysis") or {}).get("score"),
+                "repos": (port.get("repos") or [])[:6],
+            }
+    careers = await db.career_recommendations.find({"user_id": p["user_id"]}, {"_id": 0}).limit(3).to_list(3)
+    out["top_careers"] = [{"name": c.get("name"), "match": c.get("match_score")} for c in careers]
+    return out
 
 
 app.include_router(api)

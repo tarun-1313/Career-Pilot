@@ -17,6 +17,10 @@ import Roadmap from "@/pages/Roadmap";
 import Courses from "@/pages/Courses";
 import Jobs from "@/pages/Jobs";
 import Interview from "@/pages/Interview";
+import VoiceInterview from "@/pages/VoiceInterview";
+import CareerTwin from "@/pages/CareerTwin";
+import ShareProfile from "@/pages/ShareProfile";
+import PublicProfile from "@/pages/PublicProfile";
 import Chatbot from "@/pages/Chatbot";
 import Portfolio from "@/pages/Portfolio";
 import Trends from "@/pages/Trends";
@@ -33,6 +37,7 @@ function AppRouter() {
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route path="/u/:slug" element={<PublicProfile />} />
 
       <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
         <Route path="/dashboard" element={<Dashboard />} />
@@ -45,6 +50,9 @@ function AppRouter() {
         <Route path="/courses" element={<Courses />} />
         <Route path="/jobs" element={<Jobs />} />
         <Route path="/interview" element={<Interview />} />
+        <Route path="/voice-interview" element={<VoiceInterview />} />
+        <Route path="/twin" element={<CareerTwin />} />
+        <Route path="/share" element={<ShareProfile />} />
         <Route path="/chat" element={<Chatbot />} />
         <Route path="/portfolio" element={<Portfolio />} />
         <Route path="/trends" element={<Trends />} />
