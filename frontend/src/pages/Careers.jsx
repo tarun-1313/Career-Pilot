@@ -41,6 +41,13 @@ export default function Careers() {
         </div>
       )}
 
+      {loading && (
+        <div className="flat-card p-12 flex items-center gap-4">
+          <div className="dot-loader"><span/><span/><span/></div>
+          <div className="overline">CROSS-REFERENCING YOUR PROFILE WITH MARKET · ~20S</div>
+        </div>
+      )}
+
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         {careers.map((c, i) => (
           <div key={i} className="flat-card hover-lift p-8">

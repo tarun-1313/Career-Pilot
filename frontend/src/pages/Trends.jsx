@@ -17,12 +17,15 @@ const TooltipBox = ({ active, payload }) => {
 
 export default function Trends() {
   const [data, setData] = useState(null);
+  const [loadingTrends, setLoadingTrends] = useState(true);
   const [salary, setSalary] = useState(null);
   const [role, setRole] = useState("AI Engineer");
   const [exp, setExp] = useState(2);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => { getTrends().then(setData); }, []);
+  useEffect(() => {
+    getTrends().then((d) => { setData(d); setLoadingTrends(false); }).catch(() => setLoadingTrends(false));
+  }, []);
 
   const runSalary = async () => {
     setBusy(true);
@@ -39,16 +42,24 @@ export default function Trends() {
         </h1>
       </div>
 
+      {loadingTrends && (
+        <div className="flat-card p-12 flex items-center gap-4">
+          <div className="dot-loader"><span/><span/><span/></div>
+          <div className="overline">FETCHING LIVE MARKET SIGNALS · ~15S</div>
+        </div>
+      )}
+
       {data && (
         <>
           <div className="grid lg:grid-cols-2 gap-6">
             <div className="flat-card p-8">
               <div className="overline mb-4">TRENDING TECH (MOMENTUM)</div>
-              <div style={{ width: "100%", height: 280 }}>
+              <div style={{ width: "100%", height: 320 }}>
                 <ResponsiveContainer>
-                  <BarChart data={data.trending_tech || []} layout="vertical">
+                  <BarChart data={data.trending_tech || []} layout="vertical" margin={{ left: 20 }}>
                     <XAxis type="number" stroke="#71717a" fontSize={11} />
-                    <YAxis type="category" dataKey="name" stroke="#71717a" fontSize={11} width={110} />
+                    <YAxis type="category" dataKey="name" stroke="#a1a1aa" fontSize={11} width={160}
+                           tick={{ fill: "#a1a1aa" }} interval={0} />
                     <Tooltip content={<TooltipBox />} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
                     <Bar dataKey="momentum">
                       {(data.trending_tech || []).map((_, i) => (

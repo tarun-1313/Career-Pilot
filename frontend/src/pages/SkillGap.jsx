@@ -40,6 +40,13 @@ export default function SkillGap() {
         </button>
       </div>
 
+      {loading && !data && (
+        <div className="flat-card p-12 flex items-center gap-4">
+          <div className="dot-loader"><span/><span/><span/></div>
+          <div className="overline">DIFFING YOUR SKILLS AGAINST THE ROLE · ~15S</div>
+        </div>
+      )}
+
       {data && (
         <div className="grid lg:grid-cols-2 gap-6">
           <div className="flat-card p-8">

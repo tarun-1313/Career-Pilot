@@ -57,7 +57,14 @@ export default function Roadmap() {
         </div>
       </div>
 
-      {months_data.length === 0 && (
+      {loading && (
+        <div className="flat-card p-12 flex items-center gap-4">
+          <div className="dot-loader"><span/><span/><span/></div>
+          <div className="overline">BUILDING YOUR PERSONALIZED ROADMAP · ~25S</div>
+        </div>
+      )}
+
+      {!loading && months_data.length === 0 && (
         <div className="flat-card p-12 text-center text-secondary">
           Set a target role and click <strong className="text-white">Generate</strong> to build your plan.
         </div>
