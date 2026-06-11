@@ -800,7 +800,10 @@ async def voice_tts(payload: Dict[str, str], _: dict = Depends(get_current_user)
     if not text:
         raise HTTPException(400, "text required")
     if not el_client:
-        raise HTTPException(500, "ElevenLabs not configured")
+        raise HTTPException(status_code=503, detail={
+            "code": "tts_unavailable",
+            "message": "ElevenLabs not configured. Frontend should fall back to browser TTS.",
+        })
     voice_id = VOICE_PRESETS.get(voice_key, VOICE_PRESETS["technical_male"])["voice_id"]
 
     def _gen() -> bytes:
