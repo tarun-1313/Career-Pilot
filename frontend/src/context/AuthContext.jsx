@@ -24,8 +24,9 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
       return;
     }
-    // Skip auth probe on public profile route to avoid benign 401 in console.
-    if (window.location.pathname.startsWith("/u/")) {
+    // Skip auth probe on public routes to avoid benign 401 in console.
+    const path = window.location.pathname;
+    if (path === "/" || path.startsWith("/u/")) {
       setLoading(false);
       return;
     }
