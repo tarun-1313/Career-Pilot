@@ -41,15 +41,24 @@ const playB64Mp3 = (b64) =>
     audio.play().catch(() => resolve());
   });
 
+<<<<<<< HEAD
 /* ---------- WebSocket live STT (with REST fallback) ---------- */
 const useLiveSTT = (interviewId, sessionToken) => {
   const mrRef = useRef(null);
   const streamRef = useRef(null);
   const chunksRef = useRef([]);
+=======
+/* ---------- WebSocket live STT ---------- */
+const useLiveSTT = (interviewId, sessionToken) => {
+  const wsRef = useRef(null);
+  const mrRef = useRef(null);
+  const streamRef = useRef(null);
+>>>>>>> 7a4583bb30b4662d8be51904ce12acd3b81fe09b
   const [interim, setInterim] = useState("");
   const [finalText, setFinalText] = useState("");
   const [recording, setRecording] = useState(false);
 
+<<<<<<< HEAD
   const getSupportedMimeType = () => {
     const types = [
       "audio/webm;codecs=opus",
@@ -148,6 +157,67 @@ const useLiveSTT = (interviewId, sessionToken) => {
       } catch { 
         await finalize(); 
       }
+=======
+  const start = useCallback(async () => {
+    if (recording) return;
+    setInterim(""); setFinalText("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      // Try WS streaming first
+      const wsProto = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${API.replace(/^https?:/, wsProto)}/voice/stt-ws?token=${encodeURIComponent(sessionToken || "")}`;
+      const ws = new WebSocket(wsUrl);
+      ws.binaryType = "arraybuffer";
+      wsRef.current = ws;
+      let mr;
+      ws.onopen = () => {
+        mr = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
+        mrRef.current = mr;
+        mr.ondataavailable = async (e) => {
+          if (e.data.size > 0 && ws.readyState === WebSocket.OPEN) {
+            const buf = await e.data.arrayBuffer();
+            ws.send(buf);
+          }
+        };
+        mr.start(250); // 250ms chunks for low latency
+        setRecording(true);
+      };
+      ws.onmessage = (ev) => {
+        try {
+          const msg = JSON.parse(ev.data);
+          if (msg.type === "transcript" && msg.text) {
+            if (msg.is_final) {
+              setFinalText((t) => (t ? t + " " : "") + msg.text);
+              setInterim("");
+            } else {
+              setInterim(msg.text);
+            }
+          }
+        } catch {}
+      };
+      ws.onerror = () => { /* fallback handled by REST in stop() */ };
+      ws.onclose = () => { setRecording(false); };
+    } catch (e) { toast.error("Mic permission denied"); }
+  }, [recording, sessionToken]);
+
+  const stop = useCallback(async () => {
+    return new Promise((resolve) => {
+      const mr = mrRef.current;
+      const ws = wsRef.current;
+      const stream = streamRef.current;
+      const done = () => {
+        setRecording(false);
+        try { stream?.getTracks().forEach((t) => t.stop()); } catch {}
+        try { ws?.close(); } catch {}
+        mrRef.current = null; wsRef.current = null; streamRef.current = null;
+        // Allow a tick for final transcript
+        setTimeout(() => resolve(), 250);
+      };
+      if (!mr) return done();
+      mr.onstop = done;
+      try { mr.stop(); } catch { done(); }
+>>>>>>> 7a4583bb30b4662d8be51904ce12acd3b81fe09b
     });
   }, []);
 

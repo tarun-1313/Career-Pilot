@@ -20,7 +20,11 @@ dnspython==2.8.0
 ecdsa==0.19.2
 elevenlabs==2.52.0
 email-validator==2.3.0
+<<<<<<< HEAD
 
+=======
+emergentintegrations==0.2.0
+>>>>>>> 7a4583bb30b4662d8be51904ce12acd3b81fe09b
 fastapi==0.110.1
 fastembed==0.8.0
 fastuuid==0.14.0
