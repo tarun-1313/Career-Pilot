@@ -1,0 +1,147 @@
+{
+  "project_name": "CareerPilot AI",
+  "theme": "Dark",
+  "archetype": "Archetype 4 (Swiss & High-Contrast)",
+  "vibe": "Futuristic, premium, technical, startup-level professional (Linear / Vercel style)",
+  "color_palette": {
+    "background": {
+      "base": "#0C0C0C",
+      "surface": "#141414",
+      "elevated": "#1E1E1E"
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "#A1A1AA",
+      "muted": "#71717A"
+    },
+    "accent": {
+      "primary": "#E6FF00",
+      "primary_hover": "#D4E600",
+      "secondary": "#0047FF"
+    },
+    "border": {
+      "default": "#27272A",
+      "focus": "#E6FF00"
+    }
+  },
+  "typography": {
+    "headings": {
+      "font_family": "Cabinet Grotesk, sans-serif",
+      "weights": ["800", "900"],
+      "tracking": "tracking-tighter",
+      "sizes": {
+        "h1": "text-4xl sm:text-5xl lg:text-6xl",
+        "h2": "text-2xl sm:text-3xl lg:text-4xl",
+        "h3": "text-xl sm:text-2xl"
+      }
+    },
+    "body": {
+      "font_family": "Satoshi, sans-serif",
+      "weights": ["400", "500"],
+      "sizes": {
+        "base": "text-base",
+        "small": "text-sm"
+      }
+    },
+    "mono": {
+      "font_family": "JetBrains Mono, monospace",
+      "usage": "Overlines, labels, code snippets, metrics, numbers",
+      "tracking": "tracking-[0.2em]"
+    }
+  },
+  "spacing_and_layout": {
+    "bento_grid": {
+      "marketing": "Mode A: 'Tetris' grid. Asymmetrical, gap-8 to gap-12, col-span mixing.",
+      "dashboard": "Mode B: 'Control Room' grid. Tight packing, gap-4 to gap-6, full height usage."
+    },
+    "padding": "Generous (p-8 to p-12) for marketing cards. Ensure internal padding prevents text from touching borders.",
+    "corners": "Rounded-none or rounded-sm (max 4px). Sharp edges emphasize the high-contrast technical feel."
+  },
+  "surfaces": {
+    "header": "Crystal Glass: backdrop-blur-xl bg-black/60 with 1px delicate border-white/10 at the bottom.",
+    "cards": "Flat #141414 background, 1px border #27272A, no drop shadows. Use inner glow or Tracing Beam on hover.",
+    "buttons": {
+      "primary": "bg-[#E6FF00] text-black font-bold hover:bg-[#D4E600] rounded-none",
+      "secondary": "bg-transparent border border-[#27272A] text-white hover:bg-white/5 rounded-none"
+    }
+  },
+  "motion_and_interactions": {
+    "hover_states": "Buttons and cards should lift slightly (-translate-y-1). Border color brightens on hover.",
+    "focus_states": "High contrast ring. focus:ring-2 focus:ring-[#E6FF00]",
+    "transitions": "Snappy. transition-all duration-200 ease-out"
+  },
+  "components": {
+    "marketing": "Use pure HTML/Tailwind for organic, asymmetrical layouts. No Shadcn wrappers.",
+    "dashboard": "Use heavily customized Shadcn components (tables, calendars, dialogs, recharts). Strip Vercel-look to match Archetype 4.",
+    "icons": "Use @phosphor-icons/react. Installation: `yarn add @phosphor-icons/react`",
+    "charts": "Shadcn charts or Recharts. Ensure tooltips use dark surface colors and bright accent lines."
+  },
+  "testing": {
+    "attributes": "All interactive elements MUST include a kebab-case, role-based data-testid attribute (e.g., data-testid='login-button')."
+  },
+  "media": {
+    "hero_backgrounds": [
+      {
+        "url": "https://images.pexels.com/photos/13129482/pexels-photo-13129482.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Monochrome geometric abstract background with polygonal shapes creating a 3D effect.",
+        "usage": "Marketing page hero background overlay."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1638864616275-9f0b291a2eb6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTJ8MHwxfHNlYXJjaHwzfHxhYnN0cmFjdCUyMGRhcmslMjBnZW9tZXRyaWMlMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc4MDg5NzYyNHww&ixlib=rb-4.1.0&q=85",
+        "description": "Dark gradient geometry.",
+        "usage": "Footer background texture."
+      }
+    ],
+    "dashboard_illustrations": [
+      {
+        "url": "https://images.unsplash.com/photo-1516387938699-a93567ec168e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTN8MHwxfHNlYXJjaHwzfHxtb2Rlcm4lMjBwcm9mZXNzaW9uYWwlMjB3b3JraW5nJTIwbGFwdG9wfGVufDB8fHx8MTc4MDg5NzYyNHww&ixlib=rb-4.1.0&q=85",
+        "description": "Person typing on laptop.",
+        "usage": "Feature card illustration for resume analysis or AI interview."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1515378960530-7c0da6231fb1?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTN8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBwcm9mZXNzaW9uYWwlMjB3b3JraW5nJTIwbGFwdG9wfGVufDB8fHx8MTc4MDg5NzYyNHww&ixlib=rb-4.1.0&q=85",
+        "description": "Person sitting in front of laptop.",
+        "usage": "Career planning visual."
+      }
+    ],
+    "testimonials": [
+      {
+        "url": "https://images.unsplash.com/photo-1580489944761-15a19d654956?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTF8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBwb3J0cmFpdCUyMHNtaWxpbmd8ZW58MHx8fHwxNzgwODk3NjI1fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Woman in white shirt smiling.",
+        "usage": "Testimonial avatar 1."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTF8MHwxfHNlYXJjaHwyfHxwcm9mZXNzaW9uYWwlMjBwb3J0cmFpdCUyMHNtaWxpbmd8ZW58MHx8fHwxNzgwODk3NjI1fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Woman in gray jacket.",
+        "usage": "Testimonial avatar 2."
+      },
+      {
+        "url": "https://images.pexels.com/photos/29086752/pexels-photo-29086752.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Stylish woman smiling.",
+        "usage": "Testimonial avatar 3."
+      }
+    ],
+    "logos": [
+      {
+        "url": "https://images.unsplash.com/photo-1772760110621-d7b6f54c1e42?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2ODh8MHwxfHNlYXJjaHwyfHxjb21wYW55JTIwbG9nbyUyMGRhcmslMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc4MDg5NzYzMnww&ixlib=rb-4.1.0&q=85",
+        "description": "Sony logo illuminated.",
+        "usage": "Partner/Sponsor logo in marketing marquee."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1761044592252-cc6c1f3bf210?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2ODh8MHwxfHNlYXJjaHwzfHxjb21wYW55JTIwbG9nbyUyMGRhcmslMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc4MDg5NzYzMnww&ixlib=rb-4.1.0&q=85",
+        "description": "HBO Max logo.",
+        "usage": "Partner/Sponsor logo in marketing marquee."
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Do NOT use Inter, Roboto, or Space Grotesk. Enforce Cabinet Grotesk for headings and Satoshi for body. Add them via Google Fonts or standard imports.",
+    "Adhere STRICTLY to the Dark Theme Archetype 4. Do not use generic purple or violet gradients. Use the defined palette: #0C0C0C base, #E6FF00 accent.",
+    "Marketing Landing Page: Use pure HTML/Tailwind for structure. Build asymmetrical 'Tetris' grid layouts with generous spacing.",
+    "Dashboard: Implement Mode B 'Control Room' grids. Customize Shadcn UI components heavily to match the stark, high-contrast aesthetic (sharp corners, thin borders, no generic shadows).",
+    "Ensure all overlay images in hero sections use max bg-black/50 so the image remains visible.",
+    "Every interactive element MUST have a kebab-case data-testid (e.g., data-testid='upload-resume-button').",
+    "Use @phosphor-icons/react for iconography.",
+    "Media urls provided in this JSON must be used exactly as specified. Do not substitute with placeholders."
+  ]
+}

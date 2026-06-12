@@ -1,0 +1,56 @@
+{
+  "summary": "CareerPilot AI v3 backend + frontend e2e tests completed against MongoDB Atlas. All 32 prior backend tests still pass plus 8 new v3 tests: Qdrant semantic recall in chat/stream (round-2 prompt correctly references round-1 Python/FastAPI memory, Filter object does NOT throw), POST /voice-interview/emotion appends frame to Mongo, GET /voice-interview/{id}/pdf returns 400 when incomplete + 200 application/pdf when complete + 404 when missing, WS /api/voice/stt-ws closes 4401 on missing token and accepts a valid session token. Backend total: 40 passed, 1 skipped. Frontend: redesigned landing page renders with all 6 advertised testids (landing-logo, header-signin, header-cta, hero-cta-primary, hero-cta-secondary, footer-cta), floating glass cards (CAREER TWIN, MOCK INTERVIEW, OPPORTUNITY, RESUME ATS) and dashboard mockup visible. All 13 dashboard sub-pages (/twin, /share, /resume, /jobs, /interview, /chat, /portfolio, /trends, /courses, /roadmap, /careers, /skills, /profile) return 200 and render. /voice-interview live screen shows vi-webcam-toggle + vi-replay-question + vi-transcript-input + vi-submit-button; vi-pdf-button confirmed present at line 534 of VoiceInterview.jsx (report screen, reached after 6 turns).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/chat/stream (Qdrant)", "issue": "Uses deprecated qdrant_client `query()` and `add()` methods — qdrant warns these will be removed in 1.17. Switch to `query_points()` and `upsert()` with `models.Document` wrappers."},
+      {"endpoint": "WS /api/voice/stt-ws", "issue": "Sends the 'auth required' JSON frame BEFORE calling websocket.close(4401). Some clients race and close before reading the frame; consider order-flipping or wrapping the send in try/except (test still passes — websockets 16 reads the frame before close)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Landing page", "issue": "/api/auth/me fires from layout on the unauthenticated landing route, producing a benign 401 in console (carried over from iter 2 — still not addressed).", "affected_selectors": []},
+      {"flow": "Dashboard sub-pages", "issue": "Several `net::ERR_CONNECTION_CLOSED` console errors when navigating between authenticated pages — likely from in-flight SSE/EventSource or WebSocket connections that aren't aborted on route change. Pages still render correctly but the console is noisy.", "affected_selectors": []},
+      {"flow": "Roadmap page", "issue": "React hydration warning: `<span> cannot be a child of <option>` — a Select inside ProtectedRoute renders Lucide icons or labels inside <option> tags. Cosmetic but should be cleaned up.", "affected_selectors": ["select option"]}
+    ],
+    "design_issues": [
+      {"screen": "Landing", "issues": ["Zero elements with class containing 'glass' even though the design brief mentions glass cards — the floating cards are styled but the class name doesn't include 'glass'. Consider standardising the class name for parity with the brief."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_v2_features.py",
+    "/app/backend/tests/test_v3_features.py",
+    "/app/backend/tests/conftest.py",
+    "/app/test_reports/pytest/pytest_results.xml",
+    "/app/test_reports/pytest/pytest_v3_results.xml"
+  ],
+  "action_items": [
+    "Optional: replace qdrant `query()`/`add()` with `query_points()`/`upsert()` to silence deprecation warnings and ride out the upcoming 1.17 removal.",
+    "Optional: skip /api/auth/me probe on the unauthenticated `/` landing route to drop the 401 console noise.",
+    "Optional: abort in-flight EventSource/WebSocket on route unmount to clear the `ERR_CONNECTION_CLOSED` console errors on dashboard navigation.",
+    "Optional: fix Roadmap select hydration warning — remove non-text children from <option> elements.",
+    "Optional: rename floating landing-card class names to include `glass` for design-brief parity.",
+    "STILL OPEN from iter 2: split server.py (now 1528 lines) into routers."
+  ],
+  "critical_code_review_comments": [
+    "server.py grew from 1279 → 1528 lines (Qdrant init + emotion + PDF + WS relay added inline). Threshold breach is now ~2x the 700-line guideline. Strongly recommend extracting voice_interview, public_profile, chat, ws_stt into routers.",
+    "Qdrant init runs synchronously at module import (fastembed model download up to ~50MB on cold boot). Backend startup may exceed 60s on a fresh container; consider lazy init on first call or async warm-up.",
+    "qdrant runs in-memory (`QdrantClient(:memory:)`) — semantic memory is wiped on every backend restart. Acceptable for demo but should be documented or persisted to disk volume.",
+    "vi_pdf streams the BytesIO without explicit Content-Length; reportlab buffer is small but consider closing buf in a finally or returning bytes directly.",
+    "stt-ws auth check sends the error frame after `await websocket.accept()` then closes with 4401 — the accept handshake is wasted on unauthorised clients. Prefer rejecting in a depends or before accept().",
+    "EmotionFrame has no clamp on emotions dict size; a malicious client can append arbitrarily large floats. Validate keys against a known label set."
+  ],
+  "updated_files": [
+    "/app/backend/tests/conftest.py",
+    "/app/backend/tests/test_v3_features.py"
+  ],
+  "success_rate": {"backend": "100% (40/40 passing, 1 expected skip)", "frontend": "100% of advertised data-testid hooks present and functional"},
+  "test_credentials": "Mock Atlas session: session_token=test_session_1781191758560, user_id=user_test_1781191758560 (PW Tester, onboarded, skills=[Python,FastAPI]). Pytest fixture also creates a fresh user+session per session and tears down automatically.",
+  "seed_data_creation": "test_v3_features.py inserts a fake completed voice_interviews doc (with report payload) to short-circuit the 6-turn Gemini chain when testing the PDF endpoint, then deletes it in a finally block. PW Tester user + session inserted into Atlas for the playwright run.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend now 40/41 green via `pytest /app/backend/tests/ -v` (takes ~2m45s incl Gemini + Qdrant). conftest.py now `load_dotenv`s /app/backend/.env so MONGO_URL points at Atlas — DO NOT remove this. Qdrant is in-memory so any seeded chat memory is lost across backend restarts; the semantic-recall test seeds and reads within the same backend lifetime. WS test uses `websockets==16.0`. ElevenLabs 503 is BY DESIGN (cloud IP blocked).",
+  "rca_of_the_issue": "No new bugs. Console errors observed on the frontend (401 on /api/auth/me from landing, ERR_CONNECTION_CLOSED on dashboard nav, <option><span> hydration on /roadmap) are cosmetic only; all flows behave correctly. Qdrant deprecation warnings come from upstream qdrant-client 1.16 — switch to query_points()/upsert() before 1.17."
+}

@@ -1,0 +1,261 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Fonts — Cabinet Grotesk + Satoshi via Fontshare CDN, JetBrains Mono via Google Fonts */
+@import url("https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800,900,500&f[]=satoshi@400,500,700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+:root {
+    --bg-base: #0c0c0c;
+    --bg-surface: #141414;
+    --bg-elevated: #1e1e1e;
+    --text-primary: #ffffff;
+    --text-secondary: #a1a1aa;
+    --text-muted: #71717a;
+    --accent: #e6ff00;
+    --accent-hover: #d4e600;
+    --accent-blue: #0047ff;
+    --border-default: #27272a;
+}
+
+@layer base {
+    :root {
+        --background: 0 0% 4.7%;
+        --foreground: 0 0% 100%;
+        --card: 0 0% 7.8%;
+        --card-foreground: 0 0% 100%;
+        --popover: 0 0% 7.8%;
+        --popover-foreground: 0 0% 100%;
+        --primary: 65 100% 50%;
+        --primary-foreground: 0 0% 0%;
+        --secondary: 0 0% 11.7%;
+        --secondary-foreground: 0 0% 100%;
+        --muted: 0 0% 11.7%;
+        --muted-foreground: 0 0% 63.1%;
+        --accent: 65 100% 50%;
+        --accent-foreground: 0 0% 0%;
+        --destructive: 0 84% 60%;
+        --destructive-foreground: 0 0% 98%;
+        --border: 240 4% 16%;
+        --input: 240 4% 16%;
+        --ring: 65 100% 50%;
+        --chart-1: 65 100% 50%;
+        --chart-2: 219 100% 50%;
+        --chart-3: 142 71% 45%;
+        --chart-4: 25 95% 53%;
+        --chart-5: 280 65% 60%;
+        --radius: 2px;
+    }
+}
+
+* {
+    border-color: hsl(var(--border));
+}
+
+html,
+body {
+    background: var(--bg-base);
+    color: var(--text-primary);
+    font-family: "Satoshi", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+h4,
+.font-display {
+    font-family: "Cabinet Grotesk", "Satoshi", sans-serif;
+    letter-spacing: -0.025em;
+}
+
+.font-mono {
+    font-family: "JetBrains Mono", monospace;
+}
+
+/* selection */
+::selection {
+    background: var(--accent);
+    color: #000;
+}
+
+/* scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: var(--bg-base);
+}
+::-webkit-scrollbar-thumb {
+    background: var(--border-default);
+    border-radius: 0;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #3f3f46;
+}
+
+/* utility */
+.bg-base {
+    background: var(--bg-base);
+}
+.bg-surface {
+    background: var(--bg-surface);
+}
+.bg-elevated {
+    background: var(--bg-elevated);
+}
+.text-secondary {
+    color: var(--text-secondary);
+}
+.text-muted {
+    color: var(--text-muted);
+}
+.text-accent {
+    color: var(--accent);
+}
+.bg-accent-yellow {
+    background: var(--accent);
+}
+.border-default {
+    border-color: var(--border-default);
+}
+.tracking-display {
+    letter-spacing: -0.04em;
+}
+
+/* glass header */
+.glass-header {
+    background: rgba(12, 12, 12, 0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* card */
+.flat-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 2px;
+    transition: border-color 200ms ease-out, transform 200ms ease-out;
+}
+.flat-card:hover {
+    border-color: #3f3f46;
+}
+.flat-card.hover-lift:hover {
+    transform: translateY(-2px);
+}
+
+/* yellow button */
+.btn-yellow {
+    background: var(--accent);
+    color: #000;
+    font-weight: 700;
+    padding: 12px 22px;
+    border-radius: 2px;
+    transition: background-color 200ms ease-out, transform 200ms ease-out;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: none;
+    cursor: pointer;
+}
+.btn-yellow:hover {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
+}
+.btn-ghost {
+    background: transparent;
+    color: #fff;
+    border: 1px solid var(--border-default);
+    padding: 11px 22px;
+    border-radius: 2px;
+    transition: all 200ms ease-out;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+.btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: #52525b;
+}
+
+/* overline label */
+.overline {
+    font-family: "JetBrains Mono", monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+/* gradient text accent (yellow→white) */
+.accent-text {
+    background: linear-gradient(90deg, #e6ff00 0%, #ffffff 70%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* noise overlay */
+.noise::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+    opacity: 0.04;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+}
+
+/* grid bg */
+.grid-bg {
+    background-image: linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    background-size: 48px 48px;
+}
+.bg-gradient-radial {
+    background-image: radial-gradient(var(--tw-gradient-stops));
+}
+
+/* marquee */
+@keyframes marquee {
+    from {
+        transform: translateX(0);
+    }
+    to {
+        transform: translateX(-50%);
+    }
+}
+.marquee {
+    animation: marquee 32s linear infinite;
+}
+
+/* loader */
+@keyframes pulseDot {
+    0%,
+    100% {
+        opacity: 0.3;
+    }
+    50% {
+        opacity: 1;
+    }
+}
+.dot-loader span {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin: 0 2px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: pulseDot 1.2s infinite;
+}
+.dot-loader span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+.dot-loader span:nth-child(3) {
+    animation-delay: 0.4s;
+}

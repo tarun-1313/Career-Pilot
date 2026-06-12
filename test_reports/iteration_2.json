@@ -1,0 +1,48 @@
+{
+  "summary": "CareerPilot AI v2 backend + frontend e2e tests completed. All 14 new v2 endpoint tests pass (voice-interview presets/start/answer/get/list, voice/tts expected 503, voice/stt Deepgram, code/evaluate, resume/rewrite both branches, career-twin brief+get, public-profile publish+me, public/{slug} unauth, public/{slug} 404). All 18 prior regression tests still pass (auth, profile, resume, careers, skill-gap, roadmap, courses, jobs, portfolio, trends, salary, interview, SSE chat, progress). Total backend: 32/32 (1 skipped for unseeded career-pilot-14 slug). Frontend: /voice-interview setup + live screens fully wired, /twin, /share, /u/twin-demo public route, and /resume page all load correctly with the advertised data-testids.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/voice-interview/answer", "issue": "Replays prior answers through chat.send_message on every turn to rebuild Gemini context. With LlmChat session_id persistence this duplicates message history and increases token/latency cost. Could rely on session_id alone or reconstruct only once on cold-start."},
+      {"endpoint": "POST /api/voice/tts", "issue": "When ELEVENLABS not configured returns 500 instead of 503/tts_unavailable, breaking the same client fallback contract. Consider unifying both paths under the 503 tts_unavailable shape."},
+      {"endpoint": "POST /api/code/evaluate", "issue": "Schema is Dict[str, str]; an oversized payload (>6KB) is silently truncated. No explicit limit error returned to caller."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Voice TTS", "issue": "Backend correctly returns 503 tts_unavailable. Two 503 console errors logged per question while the browser falls back to window.speechSynthesis. Expected behaviour per design but pollutes the console; consider downgrading to console.warn in VoiceInterview.jsx after first failure.", "affected_selectors": ["vi-replay-question"]},
+      {"flow": "Public profile route /u/:slug", "issue": "Layout still fires /api/auth/me even on the public unauthenticated route, producing a benign 401 in console. PublicProfile renders fine, but the AppShell auth probe should be skipped for /u/* routes.", "affected_selectors": []}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_v2_features.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/conftest.py",
+    "/app/test_reports/pytest/pytest_v2_results.xml"
+  ],
+  "action_items": [
+    "Optional: in /api/voice/tts, return 503 tts_unavailable when el_client is None too (currently 500).",
+    "Optional: skip /api/auth/me call from layout when the route matches /u/:slug to avoid the 401 console error on the unauthenticated public profile page.",
+    "Optional: in VoiceInterview.jsx swallow the first /api/voice/tts 503 silently (downgrade to console.warn) since it is expected by design.",
+    "Optional: split server.py (1279 lines) into routers (voice_interview.py, public_profile.py, career_twin.py, resume_rewrite.py) — exceeds the 700-line guideline."
+  ],
+  "critical_code_review_comments": [
+    "server.py grew from 780 → 1279 lines; well beyond the 700-line threshold. Strongly recommend extracting voice_interview, career_twin, public_profile, resume_rewrite, code_eval into their own routers.",
+    "vi_answer() replays the entire conversation through LlmChat.send_message on every turn for 'reload safety' even though LlmChat persists via session_id. This is O(n^2) tokens and slows each subsequent turn — only replay on cold start (e.g. when chat session not in memory).",
+    "_gemini_json + LlmChat(...).with_model(...) instantiation now repeated in 10+ handlers. Extract a single helper (already noted in iter 1; still not done).",
+    "resume_rewrite endpoint hard-codes content max at 9000 chars; large resumes silently truncated with no warning. Surface a warning in the response or in the docx.",
+    "public_profile.publish does not strip leading/trailing hyphens or reject reserved slugs like 'me', 'public', 'admin'. Consider adding a reserved-slug list."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_v2_features.py"
+  ],
+  "success_rate": {"backend": "100% (32/32 passing, 1 skipped expected)", "frontend": "100% of advertised data-testid hooks present and functional"},
+  "test_credentials": "Mock session in MongoDB. Latest active session: session_token=test_session_1781190193304, user_id=user_test_1781190193304 (created during this run, public_profiles.slug='twin-demo' seeded for this user). Conftest creates fresh user per pytest session and tears down automatically.",
+  "seed_data_creation": "Created TEST_pw user + 7-day session + public_profiles{slug:'twin-demo'} record for frontend playwright tests. Backend test_resume_rewrite_with_resume inserts and removes a fake resumes doc per test.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend 32/32 green via `pytest /app/backend/tests/ -v` (takes ~2m incl Gemini). ElevenLabs TTS 503 is BY DESIGN. Deepgram STT accepts 1s silent WAV and returns 200 with empty transcript. For frontend playwright, set cookie session_token from /app/auth_testing.md and use the seeded twin-demo slug for public route checks. Public route hits /api/auth/me producing a console 401 — benign.",
+  "rca_of_the_issue": "No new bugs found. ElevenLabs 503 is intended behaviour (cloud IP blocked free tier). Console 503/401 chatter on /u/* and voice-interview pages is cosmetic only; flows behave correctly with browser TTS fallback."
+}
