@@ -441,7 +441,7 @@ You'll also need API keys for these services (all are free tier available):
 
 ```bash
 git clone <your-repo-url>
-cd Career-Pilot-main
+cd Margdarshak-Sathi
 ```
 
 ### 2. Backend Setup
