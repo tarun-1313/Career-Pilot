@@ -331,7 +331,7 @@ Install dependencies:
 
 ```bash
 =======
-# CareerPilot AI
+# MargdarshakSathi AI
 
 🚀 Your personal AI-powered career coach! Everything you need to land your dream job in one place.
 
